@@ -5,8 +5,38 @@ use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tungstenite::Message;
 
+use std::fs;
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct ServerConfig {
+    port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self { port: 9001 }
+    }
+}
+
 pub async fn start_server(state: Arc<crate::AppState>) {
-    let addr = "0.0.0.0:9001";
+    let config_path = "server_config.json";
+
+    let config = if let Ok(data) = fs::read_to_string(config_path) {
+        if let Ok(parsed) = serde_json::from_str::<ServerConfig>(&data) {
+            parsed
+        } else {
+            eprintln!("[WS] Failed to parse {}, using defaults.", config_path);
+            ServerConfig::default()
+        }
+    } else {
+        let def = ServerConfig::default();
+        if let Ok(json) = serde_json::to_string_pretty(&def) {
+            let _ = fs::write(config_path, json);
+        }
+        def
+    };
+
+    let addr = format!("0.0.0.0:{}", config.port);
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
@@ -52,7 +82,11 @@ pub async fn start_server(state: Arc<crate::AppState>) {
 
             let mut write_task = tokio::spawn(async move {
                 while let Some(msg) = event_rx.recv().await {
-                    if ws_tx.send(Message::Text(msg.to_string().into())).await.is_err() {
+                    if ws_tx
+                        .send(Message::Text(msg.to_string().into()))
+                        .await
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -104,7 +138,10 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
     match cmd {
         "list_serial_ports" => {
             let ports = match serialport::available_ports() {
-                Ok(ports) => ports.into_iter().map(|p| p.port_name).collect::<Vec<String>>(),
+                Ok(ports) => ports
+                    .into_iter()
+                    .map(|p| p.port_name)
+                    .collect::<Vec<String>>(),
                 Err(_) => vec![],
             };
             Ok(serde_json::to_value(ports).unwrap())
@@ -126,24 +163,40 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             Ok(serde_json::Value::Null)
         }
         "connect_serial" => {
-            let port = args["port_name"].as_str().unwrap_or("");
-            let baud = args["baud_rate"].as_u64().unwrap_or(115200) as u32;
+            let port = args["port_name"]
+                .as_str()
+                .or(args["portName"].as_str())
+                .unwrap_or("");
+            let baud = args["baud_rate"]
+                .as_u64()
+                .or(args["baudRate"].as_u64())
+                .unwrap_or(115200) as u32;
             let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
             driver.connect_serial(port, baud)?;
             Ok(serde_json::Value::String(format!("Connected to {}", port)))
         }
         "connect_telnet" => {
             let host = args["host"].as_str().unwrap_or("");
-            let port = args["ws_port"].as_u64().map(|p| p as u16).unwrap_or(23);
+            let port = args["ws_port"]
+                .as_u64()
+                .or(args["wsPort"].as_u64())
+                .map(|p| p as u16)
+                .unwrap_or(23);
             let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
             driver.connect_telnet(host, port)?;
-            Ok(serde_json::Value::String(format!("Connected to {}:{}", host, port)))
+            Ok(serde_json::Value::String(format!(
+                "Connected to {}:{}",
+                host, port
+            )))
         }
         "disconnect" => {
             let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
             driver.disconnect();
             Ok(serde_json::Value::Null)
         }
-        _ => Err(format!("Command {} not implemented in standalone server", cmd)),
+        _ => Err(format!(
+            "Command {} not implemented in standalone server",
+            cmd
+        )),
     }
 }

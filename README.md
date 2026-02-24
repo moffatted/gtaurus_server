@@ -19,7 +19,7 @@ The `gtaurus_server` acts as this broker:
 
 - **Language**: Rust
 - **Transport Protocol**: WebSockets via `tokio-tungstenite`.
-- **Port**: `9001` (by default).
+- **Port**: `9001` (by default, configurable via `server_config.json`).
 - **Driver Architecture**: Implements a `FluidNCDriver` containing the same serial and network logic as the Tauri desktop application, but decoupled from the desktop windowing environment.
 - **Message Format**: Uses a lightweight JSON wrapper over WebSocket:
   - Frontend to Server (`invoke`): `{ "type": "invoke", "cmd": "send_gcode", "args": { "cmd": "G0 X10" }, "id": "req_1" }`
@@ -63,3 +63,15 @@ Starting Gtaurus Standalone Server...
 ```
 
 Once it's running, you can open the Gtaurus web frontend in your browser, and it will automatically attempt to connect to this server when not running in the Tauri desktop environment.
+
+### Changing the Port
+
+By default, the server listens on port `9001`. On its first run, it creates a `server_config.json` file in its current directory. You can edit this file to change the port if that port is already in use by another application:
+
+```json
+{
+  "port": 9002
+}
+```
+
+Restart the server to apply the changes.
