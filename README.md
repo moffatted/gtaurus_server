@@ -71,6 +71,20 @@ On the first run, the server creates a `server_config.json` file. You can custom
 - `default_serial_port`: Set this to a specific port (e.g., `"/dev/ttyUSB0"`) to bypass auto-discovery.
 - `default_baud_rate`: The baud rate for the serial connection (default is 115200).
 
+## Firewall & Security
+
+To protect the server from unauthorized access or potential attacks, it is highly recommended to set up a firewall rule. By default, the server listens on port `9001`.
+
+If you are using `ufw` (Uncomplicated Firewall) on Linux, you can allow traffic to the WebSocket port with:
+
+```bash
+# Allow access from any IP (use with caution)
+sudo ufw allow 9001/tcp
+
+# Or, more securely, only allow access from a specific IP address
+sudo ufw allow from 192.168.1.100 to any port 9001 proto tcp
+```
+
 ## Systemd Service (Linux)
 
 To have the server start automatically as a background service on Linux, you can use the provided setup script:
