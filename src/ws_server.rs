@@ -363,6 +363,12 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
         "list_local_files" => {
             let path = args["path"].as_str().unwrap_or("");
             println!("[GTaurus Server] list_local_files: path={:?}", path);
+
+            // Force error if path style doesn't match OS to trigger healer
+            if path.contains(':') && cfg!(not(windows)) {
+                return Err("Absolute Windows paths are not supported on this platform".to_string());
+            }
+
             let mut files = Vec::new();
             let entries = std::fs::read_dir(path).map_err(|e| {
                 println!("[GTaurus Server] Failed to read dir: {:?} - {}", path, e);
@@ -399,6 +405,12 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             let path = args["path"].as_str().unwrap_or("");
             let filename = args["filename"].as_str().unwrap_or("");
             let content = args["content"].as_str().unwrap_or("");
+
+            // Force error if path style doesn't match OS to trigger healer
+            if path.contains(':') && cfg!(not(windows)) {
+                return Err("Absolute Windows paths are not supported on this platform".to_string());
+            }
+
             println!(
                 "[GTaurus Server] save_local_file: path={:?}, filename={:?}, size={}",
                 path,
