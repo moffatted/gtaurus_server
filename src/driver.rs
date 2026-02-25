@@ -105,7 +105,14 @@ impl FluidNCDriver {
                             Self::emit(&subscribers, &trimmed);
                         }
                     }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => continue,
+                    Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                        if let Ok(s) = status.lock() {
+                            if matches!(*s, ConnectionStatus::Disconnected) {
+                                break;
+                            }
+                        }
+                        continue;
+                    }
                     Err(_) => {
                         Self::emit(&subscribers, "[GTaurus] Serial read error");
                         if let Ok(mut s) = status.lock() {
@@ -178,7 +185,14 @@ impl FluidNCDriver {
                             Self::emit(&subscribers, &trimmed);
                         }
                     }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => continue,
+                    Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                        if let Ok(s) = status.lock() {
+                            if matches!(*s, ConnectionStatus::Disconnected) {
+                                break;
+                            }
+                        }
+                        continue;
+                    }
                     Err(e) => {
                         Self::emit(&subscribers, &format!("[GTaurus] Telnet read error: {e}"));
                         if let Ok(mut s) = status.lock() {
