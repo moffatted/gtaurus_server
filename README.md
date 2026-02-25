@@ -14,6 +14,7 @@ The `gtaurus_server` acts as this broker:
 - It exposes a WebSocket server on `ws://0.0.0.0:9001` that the Gtaurus web frontend can connect to.
 - It translates JSON payloads via WebSocket into raw hardware commands (Serial/USB or Telnet) to drive the FluidNC controller.
 - It forwards real-time hardware status and responses back to the frontend.
+- **Robustness**: Automatically detects and reconnects to the serial port if the connection is lost (e.g., USB unplugged or CNC powered off).
 
 ## Technical Details
 
@@ -21,15 +22,12 @@ The `gtaurus_server` acts as this broker:
 - **Transport Protocol**: WebSockets via `tokio-tungstenite`.
 - **Port**: `9001` (by default, configurable via `server_config.json`).
 - **Driver Architecture**: Implements a `FluidNCDriver` containing the same serial and network logic as the Tauri desktop application, but decoupled from the desktop windowing environment.
-- **Message Format**: Uses a lightweight JSON wrapper over WebSocket:
-  - Frontend to Server (`invoke`): `{ "type": "invoke", "cmd": "send_gcode", "args": { "cmd": "G0 X10" }, "id": "req_1" }`
-  - Server to Frontend (`response`): `{ "type": "response", "id": "req_1", "payload": null }`
-  - Server to Frontend Event (`event`): `{ "type": "event", "event": "fluidnc://rx", "payload": "..." }`
+- **Logging**: All activity and errors are logged to the console and to `gtaurus_server.log`.
 
 ## Prerequisites
 
-- Request cargo/rust (`rustup`) toolchain.
-- Standard build tools depending on the OS (e.g. build-essential on Linux, MSVC on Windows).
+- Rust (`rustup`) toolchain.
+- Standard build tools (e.g., `build-essential` on Linux).
 
 ## Building
 
@@ -49,29 +47,56 @@ You can run the application directly with Cargo during development:
 cargo run
 ```
 
-Or you can run the compiled binary:
+Or run the compiled binary:
 
 ```bash
 ./target/release/gtaurus_server
 ```
 
-When started, you should see:
+## Configuration
 
-```text
-Starting Gtaurus Standalone Server...
-[WS] Server listening on ws://0.0.0.0:9001
-```
-
-Once it's running, you can open the Gtaurus web frontend in your browser, and it will automatically attempt to connect to this server when not running in the Tauri desktop environment.
-
-### Changing the Port
-
-By default, the server listens on port `9001`. On its first run, it creates a `server_config.json` file in its current directory. You can edit this file to change the port if that port is already in use by another application:
+On the first run, the server creates a `server_config.json` file. You can customize the following options:
 
 ```json
 {
-  "port": 9002
+  "port": 9001,
+  "auto_connect": true,
+  "default_serial_port": null,
+  "default_baud_rate": 115200
 }
 ```
 
-Restart the server to apply the changes.
+- `port`: The WebSocket port to listen on.
+- `auto_connect`: If `true`, the server will automatically search for and connect to a serial port on startup and whenever the connection is lost.
+- `default_serial_port`: Set this to a specific port (e.g., `"/dev/ttyUSB0"`) to bypass auto-discovery.
+- `default_baud_rate`: The baud rate for the serial connection (default is 115200).
+
+## Systemd Service (Linux)
+
+To have the server start automatically as a background service on Linux, you can use the provided setup script:
+
+```bash
+chmod +x setup_systemd.sh
+./setup_systemd.sh
+```
+
+This script creates a `systemd` user service. You can then manage it with:
+
+```bash
+# Enable to start on login
+systemctl --user enable gtaurus_server.service
+
+# Start the service
+systemctl --user start gtaurus_server.service
+
+# Check status
+systemctl --user status gtaurus_server.service
+
+# View live logs
+journalctl --user -u gtaurus_server.service -f
+```
+
+To allow the service to run even when you are not logged in:
+```bash
+loginctl enable-linger $USER
+```
