@@ -35,6 +35,8 @@ pub trait GCodeConnection: Send {
     fn disconnect(&mut self);
     fn get_status(&self) -> String;
     fn add_rx_subscriber(&mut self, tx: std::sync::mpsc::Sender<String>);
+    fn set_auto_connect_suspended(&mut self, suspended: bool);
+    fn is_auto_connect_suspended(&self) -> bool;
 }
 
 enum ActiveConnection {
@@ -55,6 +57,7 @@ pub struct FluidNCDriver {
     conn: ActiveConnection,
     status: Arc<Mutex<ConnectionStatus>>,
     subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
+    pub auto_connect_suspended: bool,
 }
 
 impl FluidNCDriver {
@@ -63,6 +66,7 @@ impl FluidNCDriver {
             conn: ActiveConnection::None,
             status: Arc::new(Mutex::new(ConnectionStatus::Disconnected)),
             subscribers: Arc::new(Mutex::new(Vec::new())),
+            auto_connect_suspended: false,
         }
     }
 
@@ -364,5 +368,13 @@ impl GCodeConnection for FluidNCDriver {
         if let Ok(mut subs) = self.subscribers.lock() {
             subs.push(tx);
         }
+    }
+
+    fn set_auto_connect_suspended(&mut self, suspended: bool) {
+        self.auto_connect_suspended = suspended;
+    }
+
+    fn is_auto_connect_suspended(&self) -> bool {
+        self.auto_connect_suspended
     }
 }

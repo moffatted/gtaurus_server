@@ -51,13 +51,16 @@ impl Default for ServerConfig {
 }
 
 async fn attempt_auto_connect(state: Arc<crate::AppState>, config: &ServerConfig) {
-    let is_disconnected = if let Ok(lock) = state.driver.lock() {
-        lock.get_status() == "Disconnected"
+    let (is_disconnected, is_suspended) = if let Ok(lock) = state.driver.lock() {
+        (
+            lock.get_status() == "Disconnected",
+            lock.is_auto_connect_suspended(),
+        )
     } else {
-        false
+        (false, false)
     };
 
-    if !is_disconnected {
+    if !is_disconnected || is_suspended {
         return;
     }
 
@@ -267,6 +270,7 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
                 .or(args["baudRate"].as_u64())
                 .unwrap_or(115200) as u32;
             let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
+            driver.set_auto_connect_suspended(false);
             driver.connect_serial(port, baud)?;
             Ok(serde_json::Value::String(format!("Connected to {}", port)))
         }
@@ -278,6 +282,7 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
                 .map(|p| p as u16)
                 .unwrap_or(23);
             let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
+            driver.set_auto_connect_suspended(false);
             driver.connect_telnet(host, port)?;
             Ok(serde_json::Value::String(format!(
                 "Connected to {}:{}",
@@ -287,6 +292,7 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
         "disconnect" => {
             let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
             driver.disconnect();
+            driver.set_auto_connect_suspended(true);
             Ok(serde_json::Value::Null)
         }
         _ => Err(format!(
