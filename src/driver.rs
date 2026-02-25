@@ -135,7 +135,10 @@ impl FluidNCDriver {
                     }
                     thread::sleep(Duration::from_millis(1));
                 }
-                if writeln!(writer_port.0, "{}", cmd).is_err() || writer_port.0.flush().is_err() {
+                let full_cmd = format!("{}\n", cmd);
+                if writer_port.0.write_all(full_cmd.as_bytes()).is_err()
+                    || writer_port.0.flush().is_err()
+                {
                     Self::emit(&subscribers, "[GTaurus] Serial write error");
                     if let Ok(mut s) = status.lock() {
                         *s = ConnectionStatus::Disconnected;
@@ -197,7 +200,8 @@ impl FluidNCDriver {
         thread::spawn(move || {
             for cmd in rx {
                 let mut s = stream.lock().unwrap();
-                if writeln!(s, "{}", cmd).is_err() || s.flush().is_err() {
+                let full_cmd = format!("{}\n", cmd);
+                if s.write_all(full_cmd.as_bytes()).is_err() || s.flush().is_err() {
                     Self::emit(&subscribers, "[GTaurus] Telnet write error");
                     if let Ok(mut s) = status.lock() {
                         *s = ConnectionStatus::Disconnected;
