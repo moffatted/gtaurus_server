@@ -295,6 +295,35 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             driver.set_auto_connect_suspended(true);
             Ok(serde_json::Value::Null)
         }
+        "resume_auto_connect" => {
+            let config_path = "server_config.json";
+            let config = std::fs::read_to_string(config_path)
+                .map(|data| serde_json::from_str::<ServerConfig>(&data).unwrap_or_default())
+                .unwrap_or_default();
+
+            let mut driver = state.driver.lock().map_err(|_| "Lock failed")?;
+            driver.set_auto_connect_suspended(false);
+
+            if driver.get_status() == "Disconnected" {
+                let port_to_use = if let Some(p) = config.default_serial_port.clone() {
+                    Some(p)
+                } else {
+                    match serialport::available_ports() {
+                        Ok(ports) if !ports.is_empty() => Some(ports[0].port_name.clone()),
+                        _ => None,
+                    }
+                };
+
+                if let Some(port) = port_to_use {
+                    let baud = config.default_baud_rate.unwrap_or(115200);
+                    let _ = driver.connect_serial(&port, baud);
+                }
+            }
+
+            Ok(serde_json::Value::String(
+                "Auto-connect resumed".to_string(),
+            ))
+        }
         _ => Err(format!(
             "Command {} not implemented in standalone server",
             cmd
