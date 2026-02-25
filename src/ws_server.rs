@@ -364,26 +364,26 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             let path = args["path"].as_str().unwrap_or("");
             println!("[GTaurus Server] list_local_files: path={:?}", path);
             let mut files = Vec::new();
-            if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries.flatten() {
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.is_file() {
-                            let modified = metadata
-                                .modified()
-                                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .map(|d| d.as_secs())
-                                .unwrap_or(0);
-                            files.push(serde_json::json!({
-                                "name": entry.file_name().to_string_lossy().to_string(),
-                                "size": metadata.len(),
-                                "modified": modified
-                            }));
-                        }
+            let entries = std::fs::read_dir(path).map_err(|e| {
+                println!("[GTaurus Server] Failed to read dir: {:?} - {}", path, e);
+                e.to_string()
+            })?;
+            for entry in entries.flatten() {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_file() {
+                        let modified = metadata
+                            .modified()
+                            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        files.push(serde_json::json!({
+                            "name": entry.file_name().to_string_lossy().to_string(),
+                            "size": metadata.len(),
+                            "modified": modified
+                        }));
                     }
                 }
-            } else {
-                println!("[GTaurus Server] Failed to read dir: {:?}", path);
             }
             Ok(serde_json::Value::Array(files))
         }
