@@ -5,16 +5,48 @@ use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tungstenite::Message;
 
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+
+fn log_msg(msg: &str) {
+    println!("{}", msg);
+    if let Ok(mut f) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("gtaurus_server.log")
+    {
+        let _ = writeln!(f, "{}", msg);
+    }
+}
+
+fn log_err(msg: &str) {
+    eprintln!("{}", msg);
+    if let Ok(mut f) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("gtaurus_server.log")
+    {
+        let _ = writeln!(f, "ERROR: {}", msg);
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 struct ServerConfig {
     port: u16,
+    auto_connect: bool,
+    default_serial_port: Option<String>,
+    default_baud_rate: Option<u32>,
 }
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { port: 9001 }
+        Self {
+            port: 9001,
+            auto_connect: true,
+            default_serial_port: None,
+            default_baud_rate: Some(115200),
+        }
     }
 }
 
@@ -25,7 +57,10 @@ pub async fn start_server(state: Arc<crate::AppState>) {
         if let Ok(parsed) = serde_json::from_str::<ServerConfig>(&data) {
             parsed
         } else {
-            eprintln!("[WS] Failed to parse {}, using defaults.", config_path);
+            log_err(&format!(
+                "[WS] Failed to parse {}, using defaults.",
+                config_path
+            ));
             ServerConfig::default()
         }
     } else {
@@ -36,15 +71,57 @@ pub async fn start_server(state: Arc<crate::AppState>) {
         def
     };
 
+    if config.auto_connect {
+        let port_to_use = if let Some(p) = config.default_serial_port.clone() {
+            Some(p)
+        } else {
+            match serialport::available_ports() {
+                Ok(ports) => {
+                    if ports.is_empty() {
+                        log_err(
+                            "[WS] Auto-connect failed: No serial ports detected on the system.",
+                        );
+                        None
+                    } else {
+                        // Grab the first available port
+                        Some(ports[0].port_name.clone())
+                    }
+                }
+                Err(e) => {
+                    log_err(&format!(
+                        "[WS] Auto-connect failed: Could not enumerate serial ports: {}",
+                        e
+                    ));
+                    None
+                }
+            }
+        };
+
+        if let Some(port) = port_to_use {
+            let baud = config.default_baud_rate.unwrap_or(115200);
+            log_msg(&format!(
+                "[WS] Auto-connecting to {} at {} baud...",
+                port, baud
+            ));
+            if let Ok(mut lock) = state.driver.lock() {
+                if let Err(e) = lock.connect_serial(&port, baud) {
+                    log_err(&format!("[WS] Auto-connect failed on port {}: {}", port, e));
+                } else {
+                    log_msg(&format!("[WS] Successfully auto-connected to {}", port));
+                }
+            }
+        }
+    }
+
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("[WS] Failed to bind to {}: {}", addr, e);
+            log_err(&format!("[WS] Failed to bind to {}: {}", addr, e));
             return;
         }
     };
-    println!("[WS] Server listening on ws://{}", addr);
+    log_msg(&format!("[WS] Server listening on ws://{}", addr));
 
     while let Ok((stream, _)) = listener.accept().await {
         let state_clone = state.clone();
@@ -52,12 +129,12 @@ pub async fn start_server(state: Arc<crate::AppState>) {
             let ws_stream = match accept_async(stream).await {
                 Ok(ws) => ws,
                 Err(e) => {
-                    eprintln!("[WS] Handshake failed: {}", e);
+                    log_err(&format!("[WS] Handshake failed: {}", e));
                     return;
                 }
             };
 
-            println!("[WS] New client connected");
+            log_msg("[WS] New client connected");
             let (mut ws_tx, mut ws_rx) = ws_stream.split();
 
             let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<Value>(32);
@@ -129,7 +206,7 @@ pub async fn start_server(state: Arc<crate::AppState>) {
                 _ = &mut read_task => {},
             };
 
-            println!("[WS] Client disconnected");
+            log_msg("[WS] Client disconnected");
         });
     }
 }
