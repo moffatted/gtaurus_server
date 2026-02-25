@@ -263,6 +263,31 @@ pub async fn start_server(state: Arc<crate::AppState>) {
     }
 }
 
+fn get_resolved_path(path_arg: &str) -> std::path::PathBuf {
+    let pb = std::path::PathBuf::from(path_arg);
+
+    // Check if the path is "dirty" (e.g. Windows path on Linux or vice-versa)
+    let is_windows_path = path_arg.contains(':') || path_arg.contains('\\');
+    let is_host_windows = cfg!(windows);
+
+    // If path is empty, or clearly from the wrong OS, default to $HOME/gcode_files
+    if path_arg.is_empty()
+        || (is_windows_path && !is_host_windows)
+        || (!is_windows_path && is_host_windows && !path_arg.starts_with('\\'))
+    {
+        let home = if is_host_windows {
+            std::env::var("USERPROFILE").unwrap_or_else(|_| "C:/".to_string())
+        } else {
+            std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())
+        };
+        let mut base = std::path::PathBuf::from(home);
+        base.push("gcode_files");
+        return base;
+    }
+
+    pb
+}
+
 async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Result<Value, String> {
     match cmd {
         "list_serial_ports" => {
@@ -356,21 +381,22 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             ))
         }
         "ensure_dir_exists" => {
-            let path = args["path"].as_str().unwrap_or("");
-            std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
+            let path_arg = args["path"].as_str().unwrap_or("");
+            let path = get_resolved_path(path_arg);
+            std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
             Ok(serde_json::Value::Null)
         }
         "list_local_files" => {
-            let path = args["path"].as_str().unwrap_or("");
-            println!("[GTaurus Server] list_local_files: path={:?}", path);
+            let path_arg = args["path"].as_str().unwrap_or("");
+            let path = get_resolved_path(path_arg);
+            println!(
+                "[GTaurus Server] list_local_files: resolved_path={:?}",
+                path
+            );
 
-            // Force error if path style doesn't match OS to trigger healer
-            if path.contains(':') && cfg!(not(windows)) {
-                return Err("Absolute Windows paths are not supported on this platform".to_string());
-            }
-
+            // No longer need to manually check for ':' as get_resolved_path handles it
             let mut files = Vec::new();
-            let entries = std::fs::read_dir(path).map_err(|e| {
+            let entries = std::fs::read_dir(&path).map_err(|e| {
                 println!("[GTaurus Server] Failed to read dir: {:?} - {}", path, e);
                 e.to_string()
             })?;
@@ -394,22 +420,19 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             Ok(serde_json::Value::Array(files))
         }
         "read_local_file" => {
-            let path = args["path"].as_str().unwrap_or("");
+            let path_arg = args["path"].as_str().unwrap_or("");
             let filename = args["filename"].as_str().unwrap_or("");
-            let mut full_path = std::path::PathBuf::from(path);
+            let mut full_path = get_resolved_path(path_arg);
             full_path.push(filename);
             let content = std::fs::read_to_string(full_path).map_err(|e| e.to_string())?;
             Ok(serde_json::Value::String(content))
         }
         "save_local_file" => {
-            let path = args["path"].as_str().unwrap_or("");
+            let path_arg = args["path"].as_str().unwrap_or("");
             let filename = args["filename"].as_str().unwrap_or("");
             let content = args["content"].as_str().unwrap_or("");
 
-            // Force error if path style doesn't match OS to trigger healer
-            if path.contains(':') && cfg!(not(windows)) {
-                return Err("Absolute Windows paths are not supported on this platform".to_string());
-            }
+            let path = get_resolved_path(path_arg);
 
             println!(
                 "[GTaurus Server] save_local_file: path={:?}, filename={:?}, size={}",
@@ -417,27 +440,27 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
                 filename,
                 content.len()
             );
-            let dir = std::path::PathBuf::from(path);
-            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-            let mut full_path = dir;
+            std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+            let mut full_path = path;
             full_path.push(filename);
-            std::fs::write(full_path, content).map_err(|e| e.to_string())?;
+            std::fs::write(&full_path, content).map_err(|e| e.to_string())?;
+            println!("[GTaurus Server] Successfully saved: {:?}", full_path);
             Ok(serde_json::Value::Null)
         }
         "delete_local_file" => {
-            let path = args["path"].as_str().unwrap_or("");
+            let path_arg = args["path"].as_str().unwrap_or("");
             let filename = args["filename"].as_str().unwrap_or("");
-            let mut full_path = std::path::PathBuf::from(path);
+            let mut full_path = get_resolved_path(path_arg);
             full_path.push(filename);
             std::fs::remove_file(full_path).map_err(|e| e.to_string())?;
             Ok(serde_json::Value::Null)
         }
         "copy_to_storage" => {
-            let source_path = args["sourcePath"].as_str().unwrap_or("");
-            let dest_dir = args["destDir"].as_str().unwrap_or("");
-            let source = std::path::PathBuf::from(source_path);
+            let source_path_arg = args["sourcePath"].as_str().unwrap_or("");
+            let dest_dir_arg = args["destDir"].as_str().unwrap_or("");
+            let source = std::path::PathBuf::from(source_path_arg); // Source path is absolute, not resolved
             if let Some(filename) = source.file_name() {
-                let dest_path = std::path::PathBuf::from(dest_dir);
+                let dest_path = get_resolved_path(dest_dir_arg);
                 std::fs::create_dir_all(&dest_path).map_err(|e| e.to_string())?;
                 let mut dest = dest_path;
                 dest.push(filename);
@@ -456,7 +479,8 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             Ok(serde_json::Value::String(home))
         }
         "validate_gcode_file" => {
-            let path = args["path"].as_str().unwrap_or("");
+            let path_arg = args["path"].as_str().unwrap_or("");
+            let path = get_resolved_path(path_arg);
             let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
             let is_gcode = content.lines().any(|line| {
                 let l = line.trim();
