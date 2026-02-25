@@ -12,7 +12,9 @@ The `gtaurus_server` acts as this broker:
 
 - It runs locally on the machine physically connected to the CNC controller.
 - It exposes a WebSocket server on `ws://0.0.0.0:9001` that the Gtaurus web frontend can connect to.
+- It serves the frontend static dashboard files over HTTP on `http://0.0.0.0:8080`.
 - It translates JSON payloads via WebSocket into raw hardware commands (Serial/USB or Telnet) to drive the FluidNC controller.
+- It provides file storage boundaries to allow the web app to safely upload G-code files directly to the host machine for standalone execution.
 - It forwards real-time hardware status and responses back to the frontend.
 - **Robustness**: Automatically detects and reconnects to the serial port if the connection is lost (e.g., USB unplugged or CNC powered off).
 
@@ -62,7 +64,9 @@ On the first run, the server creates a `server_config.json` file. You can custom
   "port": 9001,
   "auto_connect": true,
   "default_serial_port": null,
-  "default_baud_rate": 115200
+  "default_baud_rate": 115200,
+  "http_port": 8080,
+  "web_root": "./public"
 }
 ```
 
@@ -70,6 +74,22 @@ On the first run, the server creates a `server_config.json` file. You can custom
 - `auto_connect`: If `true`, the server will automatically search for and connect to a serial port on startup and whenever the connection is lost.
 - `default_serial_port`: Set this to a specific port (e.g., `"/dev/ttyUSB0"`) to bypass auto-discovery.
 - `default_baud_rate`: The baud rate for the serial connection (default is 115200).
+- `http_port`: The port to run the lightweight HTTP server on for serving the frontend application.
+- `web_root`: The relative or absolute path of the directory containing the compiled `gtaurus-app` frontend files (e.g., HTML, JS, CSS). Default is `./public`.
+
+## Deploying the Web Dashboard
+
+To run the web dashboard seamlessly without needing `Node.js` or `npm run dev` running on your CNC machine host:
+
+1. On your development machine, go to the `gtaurus-app` directory and build the frontend:
+
+   ```bash
+   npm run build
+   ```
+
+2. Copy the contents of the newly generated `dist/` directory from `gtaurus-app`.
+3. Paste these files into a `public/` directory inside the `gtaurus_server` folder on your remote host.
+4. Run `gtaurus_server`. The server will now host the frontend locally at `http://<your-host-ip>:8080` while handling WebSocket connections automatically on port `9001`.
 
 ## Firewall & Security
 
