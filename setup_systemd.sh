@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-PROJECT_DIR="/home/eddiem/gtaurus_server"
+# Resolves the absolute path of the directory containing this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
 BINARY_PATH="$PROJECT_DIR/target/release/gtaurus_server"
 SERVICE_PATH="$HOME/.config/systemd/user/gtaurus_server.service"
 
