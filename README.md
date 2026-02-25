@@ -96,7 +96,12 @@ systemctl --user status gtaurus_server.service
 journalctl --user -u gtaurus_server.service -f
 ```
 
-To allow the service to run even when you are not logged in:
+### Running Headless on Boot
+
+By default, user-level systemd services only start when that specific user logs in via the desktop or SSH, and they stop immediately when the user logs out.
+
+If you want the `gtaurus_server` to start automatically the moment the machine receives power (e.g., for headless deployment in a cabinet) **without** requiring you to manually log into an account, you MUST enable "linger" for your user account:
+
 ```bash
 loginctl enable-linger $USER
 ```
