@@ -324,6 +324,112 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
                 "Auto-connect resumed".to_string(),
             ))
         }
+        "ensure_dir_exists" => {
+            let path = args["path"].as_str().unwrap_or("");
+            std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+        "list_local_files" => {
+            let path = args["path"].as_str().unwrap_or("");
+            let mut files = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() {
+                            let modified = metadata
+                                .modified()
+                                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0);
+                            files.push(serde_json::json!({
+                                "name": entry.file_name().to_string_lossy().to_string(),
+                                "size": metadata.len(),
+                                "modified": modified
+                            }));
+                        }
+                    }
+                }
+            }
+            Ok(serde_json::Value::Array(files))
+        }
+        "read_local_file" => {
+            let path = args["path"].as_str().unwrap_or("");
+            let filename = args["filename"].as_str().unwrap_or("");
+            let mut full_path = std::path::PathBuf::from(path);
+            full_path.push(filename);
+            let content = std::fs::read_to_string(full_path).map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::String(content))
+        }
+        "save_local_file" => {
+            let path = args["path"].as_str().unwrap_or("");
+            let filename = args["filename"].as_str().unwrap_or("");
+            let content = args["content"].as_str().unwrap_or("");
+            let mut full_path = std::path::PathBuf::from(path);
+            full_path.push(filename);
+            std::fs::write(full_path, content).map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+        "delete_local_file" => {
+            let path = args["path"].as_str().unwrap_or("");
+            let filename = args["filename"].as_str().unwrap_or("");
+            let mut full_path = std::path::PathBuf::from(path);
+            full_path.push(filename);
+            std::fs::remove_file(full_path).map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+        "copy_to_storage" => {
+            let source_path = args["sourcePath"].as_str().unwrap_or("");
+            let dest_dir = args["destDir"].as_str().unwrap_or("");
+            let source = std::path::PathBuf::from(source_path);
+            if let Some(filename) = source.file_name() {
+                let mut dest = std::path::PathBuf::from(dest_dir);
+                dest.push(filename);
+                std::fs::copy(source, dest).map_err(|e| e.to_string())?;
+                Ok(serde_json::Value::Null)
+            } else {
+                Err("Invalid filename".to_string())
+            }
+        }
+        "validate_gcode_file" => {
+            let path = args["path"].as_str().unwrap_or("");
+            let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+            let is_gcode = content.lines().any(|line| {
+                let l = line.trim();
+                if l.is_empty() || l.starts_with(';') || l.starts_with('(') {
+                    return false;
+                }
+                l.starts_with('G')
+                    || l.starts_with('M')
+                    || l.starts_with('X')
+                    || l.starts_with('Y')
+                    || l.starts_with('Z')
+                    || l.starts_with('$')
+                    || l.starts_with('F')
+                    || l.starts_with('S')
+                    || l.starts_with('T')
+            });
+            Ok(serde_json::Value::Bool(is_gcode))
+        }
+        "stream_local_gcode" => {
+            let path = args["path"].as_str().unwrap_or("").to_string();
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let driver_clone = state.driver.clone();
+            std::thread::spawn(move || {
+                println!("[GTaurus Server] Starting G-code stream job...");
+                for line in content.lines() {
+                    let l = line.trim();
+                    if l.is_empty() || l.starts_with(';') || l.starts_with('(') {
+                        continue;
+                    }
+                    if let Ok(mut driver) = driver_clone.lock() {
+                        let _ = driver.send_command(l.to_string());
+                    }
+                }
+                println!("[GTaurus Server] Finished streaming G-code job.");
+            });
+            Ok(serde_json::Value::String("Streaming started".to_string()))
+        }
         _ => Err(format!(
             "Command {} not implemented in standalone server",
             cmd
