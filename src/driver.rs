@@ -138,9 +138,14 @@ impl FluidNCDriver {
         subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
     ) {
         thread::spawn(move || {
-            for cmd in rx {
+            'outer: for cmd in rx {
                 let cmd_len = cmd.len() + 1;
                 loop {
+                    if let Ok(s) = status.lock() {
+                        if matches!(*s, ConnectionStatus::Disconnected) {
+                            break 'outer;
+                        }
+                    }
                     if *pending_bytes.lock().unwrap() + cmd_len < MAX_BUFFER_SIZE {
                         break;
                     }
