@@ -362,6 +362,7 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
         }
         "list_local_files" => {
             let path = args["path"].as_str().unwrap_or("");
+            println!("[GTaurus Server] list_local_files: path={:?}", path);
             let mut files = Vec::new();
             if let Ok(entries) = std::fs::read_dir(path) {
                 for entry in entries.flatten() {
@@ -381,6 +382,8 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
                         }
                     }
                 }
+            } else {
+                println!("[GTaurus Server] Failed to read dir: {:?}", path);
             }
             Ok(serde_json::Value::Array(files))
         }
@@ -396,6 +399,12 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             let path = args["path"].as_str().unwrap_or("");
             let filename = args["filename"].as_str().unwrap_or("");
             let content = args["content"].as_str().unwrap_or("");
+            println!(
+                "[GTaurus Server] save_local_file: path={:?}, filename={:?}, size={}",
+                path,
+                filename,
+                content.len()
+            );
             let dir = std::path::PathBuf::from(path);
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             let mut full_path = dir;
