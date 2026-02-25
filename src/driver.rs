@@ -53,7 +53,7 @@ enum ActiveConnection {
 
 pub struct FluidNCDriver {
     conn: ActiveConnection,
-    status: ConnectionStatus,
+    status: Arc<Mutex<ConnectionStatus>>,
     subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
 }
 
@@ -61,7 +61,7 @@ impl FluidNCDriver {
     pub fn new() -> Self {
         Self {
             conn: ActiveConnection::None,
-            status: ConnectionStatus::Disconnected,
+            status: Arc::new(Mutex::new(ConnectionStatus::Disconnected)),
             subscribers: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -77,6 +77,7 @@ impl FluidNCDriver {
         pending_bytes: Arc<Mutex<usize>>,
         pending_lens: Arc<Mutex<VecDeque<usize>>>,
         subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
+        status: Arc<Mutex<ConnectionStatus>>,
     ) {
         thread::spawn(move || {
             let mut reader = BufReader::new(reader_port.0);
@@ -86,6 +87,9 @@ impl FluidNCDriver {
                 match reader.read_line(&mut line) {
                     Ok(0) => {
                         Self::emit(&subscribers, "[GTaurus] Serial EOF");
+                        if let Ok(mut s) = status.lock() {
+                            *s = ConnectionStatus::Disconnected;
+                        }
                         break;
                     }
                     Ok(_) => {
@@ -104,6 +108,9 @@ impl FluidNCDriver {
                     Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => continue,
                     Err(_) => {
                         Self::emit(&subscribers, "[GTaurus] Serial read error");
+                        if let Ok(mut s) = status.lock() {
+                            *s = ConnectionStatus::Disconnected;
+                        }
                         break;
                     }
                 }
@@ -116,6 +123,8 @@ impl FluidNCDriver {
         rx: std::sync::mpsc::Receiver<String>,
         pending_bytes: Arc<Mutex<usize>>,
         pending_lens: Arc<Mutex<VecDeque<usize>>>,
+        status: Arc<Mutex<ConnectionStatus>>,
+        subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
     ) {
         thread::spawn(move || {
             for cmd in rx {
@@ -126,8 +135,13 @@ impl FluidNCDriver {
                     }
                     thread::sleep(Duration::from_millis(1));
                 }
-                let _ = writeln!(writer_port.0, "{}", cmd);
-                let _ = writer_port.0.flush();
+                if writeln!(writer_port.0, "{}", cmd).is_err() || writer_port.0.flush().is_err() {
+                    Self::emit(&subscribers, "[GTaurus] Serial write error");
+                    if let Ok(mut s) = status.lock() {
+                        *s = ConnectionStatus::Disconnected;
+                    }
+                    break;
+                }
                 {
                     let mut bytes = pending_bytes.lock().unwrap();
                     *bytes += cmd_len;
@@ -140,6 +154,7 @@ impl FluidNCDriver {
     fn spawn_tcp_reader(
         stream: TcpStream,
         subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
+        status: Arc<Mutex<ConnectionStatus>>,
     ) {
         thread::spawn(move || {
             let mut reader = BufReader::new(stream);
@@ -149,6 +164,9 @@ impl FluidNCDriver {
                 match reader.read_line(&mut line) {
                     Ok(0) => {
                         Self::emit(&subscribers, "[GTaurus] Telnet connection closed");
+                        if let Ok(mut s) = status.lock() {
+                            *s = ConnectionStatus::Disconnected;
+                        }
                         break;
                     }
                     Ok(_) => {
@@ -160,6 +178,9 @@ impl FluidNCDriver {
                     Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => continue,
                     Err(e) => {
                         Self::emit(&subscribers, &format!("[GTaurus] Telnet read error: {e}"));
+                        if let Ok(mut s) = status.lock() {
+                            *s = ConnectionStatus::Disconnected;
+                        }
                         break;
                     }
                 }
@@ -167,11 +188,20 @@ impl FluidNCDriver {
         });
     }
 
-    fn spawn_tcp_writer(stream: Arc<Mutex<TcpStream>>, rx: std::sync::mpsc::Receiver<String>) {
+    fn spawn_tcp_writer(
+        stream: Arc<Mutex<TcpStream>>,
+        rx: std::sync::mpsc::Receiver<String>,
+        status: Arc<Mutex<ConnectionStatus>>,
+        subscribers: Arc<Mutex<Vec<std::sync::mpsc::Sender<String>>>>,
+    ) {
         thread::spawn(move || {
             for cmd in rx {
                 let mut s = stream.lock().unwrap();
                 if writeln!(s, "{}", cmd).is_err() || s.flush().is_err() {
+                    Self::emit(&subscribers, "[GTaurus] Telnet write error");
+                    if let Ok(mut s) = status.lock() {
+                        *s = ConnectionStatus::Disconnected;
+                    }
                     break;
                 }
             }
@@ -206,10 +236,20 @@ impl GCodeConnection for FluidNCDriver {
             pending_bytes.clone(),
             pending_lens.clone(),
             self.subscribers.clone(),
+            self.status.clone(),
         );
-        Self::spawn_serial_writer(writer_clone, cmd_rx, pending_bytes, pending_lens);
+        Self::spawn_serial_writer(
+            writer_clone,
+            cmd_rx,
+            pending_bytes,
+            pending_lens,
+            self.status.clone(),
+            self.subscribers.clone(),
+        );
 
-        self.status = ConnectionStatus::Serial(port_name.to_string());
+        if let Ok(mut s) = self.status.lock() {
+            *s = ConnectionStatus::Serial(port_name.to_string());
+        }
         self.conn = ActiveConnection::Serial {
             _port: SerialWrapper(port),
             rt_port,
@@ -238,10 +278,17 @@ impl GCodeConnection for FluidNCDriver {
             &format!("[GTaurus] Connected via Telnet: {addr}"),
         );
 
-        Self::spawn_tcp_reader(reader_clone, self.subscribers.clone());
-        Self::spawn_tcp_writer(writer_arc, cmd_rx);
+        Self::spawn_tcp_reader(reader_clone, self.subscribers.clone(), self.status.clone());
+        Self::spawn_tcp_writer(
+            writer_arc,
+            cmd_rx,
+            self.status.clone(),
+            self.subscribers.clone(),
+        );
 
-        self.status = ConnectionStatus::Telnet(addr);
+        if let Ok(mut s) = self.status.lock() {
+            *s = ConnectionStatus::Telnet(addr);
+        }
         self.conn = ActiveConnection::Telnet {
             _stream: stream,
             rt_stream,
@@ -251,6 +298,9 @@ impl GCodeConnection for FluidNCDriver {
     }
 
     fn send_command(&mut self, cmd: String) -> Result<(), String> {
+        if self.get_status() == "Disconnected" {
+            return Err("Not connected".to_string());
+        }
         match &self.conn {
             ActiveConnection::Serial { cmd_tx, .. } => cmd_tx.send(cmd).map_err(|e| e.to_string()),
             ActiveConnection::Telnet { cmd_tx, .. } => cmd_tx.send(cmd).map_err(|e| e.to_string()),
@@ -259,6 +309,9 @@ impl GCodeConnection for FluidNCDriver {
     }
 
     fn send_realtime(&mut self, byte: u8) -> Result<(), String> {
+        if self.get_status() == "Disconnected" {
+            return Err("Not connected".to_string());
+        }
         match &self.conn {
             ActiveConnection::Serial { rt_port, .. } => {
                 let mut p = rt_port.lock().map_err(|_| "Poisoned".to_string())?;
@@ -276,11 +329,17 @@ impl GCodeConnection for FluidNCDriver {
 
     fn disconnect(&mut self) {
         self.conn = ActiveConnection::None;
-        self.status = ConnectionStatus::Disconnected;
+        if let Ok(mut s) = self.status.lock() {
+            *s = ConnectionStatus::Disconnected;
+        }
     }
 
     fn get_status(&self) -> String {
-        self.status.to_string()
+        if let Ok(s) = self.status.lock() {
+            s.to_string()
+        } else {
+            "Disconnected".to_string()
+        }
     }
 
     fn add_rx_subscriber(&mut self, tx: std::sync::mpsc::Sender<String>) {

@@ -30,7 +30,7 @@ fn log_err(msg: &str) {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 #[serde(default)]
 struct ServerConfig {
     port: u16,
@@ -46,6 +46,55 @@ impl Default for ServerConfig {
             auto_connect: true,
             default_serial_port: None,
             default_baud_rate: Some(115200),
+        }
+    }
+}
+
+async fn attempt_auto_connect(state: Arc<crate::AppState>, config: &ServerConfig) {
+    let is_disconnected = if let Ok(lock) = state.driver.lock() {
+        lock.get_status() == "Disconnected"
+    } else {
+        false
+    };
+
+    if !is_disconnected {
+        return;
+    }
+
+    let port_to_use = if let Some(p) = config.default_serial_port.clone() {
+        Some(p)
+    } else {
+        match serialport::available_ports() {
+            Ok(ports) => {
+                if ports.is_empty() {
+                    None
+                } else {
+                    // Grab the first available port
+                    Some(ports[0].port_name.clone())
+                }
+            }
+            Err(e) => {
+                log_err(&format!(
+                    "[WS] Auto-connect failed: Could not enumerate serial ports: {}",
+                    e
+                ));
+                None
+            }
+        }
+    };
+
+    if let Some(port) = port_to_use {
+        let baud = config.default_baud_rate.unwrap_or(115200);
+        log_msg(&format!(
+            "[WS] Auto-connecting to {} at {} baud...",
+            port, baud
+        ));
+        if let Ok(mut lock) = state.driver.lock() {
+            if let Err(e) = lock.connect_serial(&port, baud) {
+                log_err(&format!("[WS] Auto-connect failed on port {}: {}", port, e));
+            } else {
+                log_msg(&format!("[WS] Successfully auto-connected to {}", port));
+            }
         }
     }
 }
@@ -72,45 +121,14 @@ pub async fn start_server(state: Arc<crate::AppState>) {
     };
 
     if config.auto_connect {
-        let port_to_use = if let Some(p) = config.default_serial_port.clone() {
-            Some(p)
-        } else {
-            match serialport::available_ports() {
-                Ok(ports) => {
-                    if ports.is_empty() {
-                        log_err(
-                            "[WS] Auto-connect failed: No serial ports detected on the system.",
-                        );
-                        None
-                    } else {
-                        // Grab the first available port
-                        Some(ports[0].port_name.clone())
-                    }
-                }
-                Err(e) => {
-                    log_err(&format!(
-                        "[WS] Auto-connect failed: Could not enumerate serial ports: {}",
-                        e
-                    ));
-                    None
-                }
+        let state_clone = state.clone();
+        let config_clone = config.clone();
+        tokio::spawn(async move {
+            loop {
+                attempt_auto_connect(state_clone.clone(), &config_clone).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
-        };
-
-        if let Some(port) = port_to_use {
-            let baud = config.default_baud_rate.unwrap_or(115200);
-            log_msg(&format!(
-                "[WS] Auto-connecting to {} at {} baud...",
-                port, baud
-            ));
-            if let Ok(mut lock) = state.driver.lock() {
-                if let Err(e) = lock.connect_serial(&port, baud) {
-                    log_err(&format!("[WS] Auto-connect failed on port {}: {}", port, e));
-                } else {
-                    log_msg(&format!("[WS] Successfully auto-connected to {}", port));
-                }
-            }
-        }
+        });
     }
 
     let addr = format!("0.0.0.0:{}", config.port);
