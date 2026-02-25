@@ -396,7 +396,9 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             let path = args["path"].as_str().unwrap_or("");
             let filename = args["filename"].as_str().unwrap_or("");
             let content = args["content"].as_str().unwrap_or("");
-            let mut full_path = std::path::PathBuf::from(path);
+            let dir = std::path::PathBuf::from(path);
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            let mut full_path = dir;
             full_path.push(filename);
             std::fs::write(full_path, content).map_err(|e| e.to_string())?;
             Ok(serde_json::Value::Null)
@@ -414,13 +416,23 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             let dest_dir = args["destDir"].as_str().unwrap_or("");
             let source = std::path::PathBuf::from(source_path);
             if let Some(filename) = source.file_name() {
-                let mut dest = std::path::PathBuf::from(dest_dir);
+                let dest_path = std::path::PathBuf::from(dest_dir);
+                std::fs::create_dir_all(&dest_path).map_err(|e| e.to_string())?;
+                let mut dest = dest_path;
                 dest.push(filename);
                 std::fs::copy(source, dest).map_err(|e| e.to_string())?;
                 Ok(serde_json::Value::Null)
             } else {
                 Err("Invalid filename".to_string())
             }
+        }
+        "get_home_dir" => {
+            let home = if cfg!(windows) {
+                std::env::var("USERPROFILE").unwrap_or_else(|_| "C:/".to_string())
+            } else {
+                std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())
+            };
+            Ok(serde_json::Value::String(home))
         }
         "validate_gcode_file" => {
             let path = args["path"].as_str().unwrap_or("");
