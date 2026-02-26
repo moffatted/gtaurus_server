@@ -336,7 +336,7 @@ dependencies = [
 [[package]]
 name = "gtaurus_common"
 version = "0.1.0"
-source = "git+https://github.com/moffatted/gtaurus_lib.git?branch=main#94589b6ac6c05ec9898948ba54f16061c87aa996"
+source = "git+https://github.com/moffatted/gtaurus_lib.git?branch=main#6e77f7743bcddbaacac827f843b15456fb87f5c7"
 dependencies = [
  "futures-util",
  "serde",
