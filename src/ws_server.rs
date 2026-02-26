@@ -48,7 +48,7 @@ impl Default for ServerConfig {
             auto_connect: true,
             default_serial_port: None,
             default_baud_rate: Some(115200),
-            http_port: Some(8080),
+            http_port: Some(8088),
             web_root: Some("./public".to_string()),
         }
     }
