@@ -169,10 +169,26 @@ pub async fn start_server(state: Arc<crate::AppState>) {
         let routes = warp::fs::dir(web_root.clone()).with(warp::cors().allow_any_origin());
 
         log_msg(&format!(
-            "[HTTP] Dashboard Web Server listening on http://0.0.0.0:{} (serving '{}')",
-            http_port, web_root
+            "[HTTP] Attempting to start Dashboard Web Server on http://0.0.0.0:{}...",
+            http_port
         ));
-        warp::serve(routes).run(([0, 0, 0, 0], http_port)).await;
+
+        // Attempt to bind to the port first to give a better error message if it fails
+        match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", http_port)).await {
+            Ok(_) => {
+                log_msg(&format!(
+                    "[HTTP] Dashboard Web Server is now serving '{}' at http://0.0.0.0:{}",
+                    web_root, http_port
+                ));
+                warp::serve(routes).run(([0, 0, 0, 0], http_port)).await;
+            }
+            Err(e) => {
+                log_err(&format!(
+                    "[HTTP] CRITICAL: Failed to bind to port {}. Port may be in use or blocked: {}",
+                    http_port, e
+                ));
+            }
+        }
     });
 
     while let Ok((stream, _)) = listener.accept().await {
