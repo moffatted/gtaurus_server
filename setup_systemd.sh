@@ -7,6 +7,12 @@ PROJECT_DIR="$SCRIPT_DIR"
 BINARY_PATH="$PROJECT_DIR/target/release/gtaurus_server"
 SERVICE_PATH="$HOME/.config/systemd/user/gtaurus_server.service"
 
+# If we are in a submodule context, ensure we have the common lib
+if [ -f "../../.gitmodules" ]; then
+    echo "Updating submodules..."
+    (cd ../.. && git submodule update --init --recursive)
+fi
+
 echo "Building gtaurus_server in release mode..."
 cargo build --release
 
