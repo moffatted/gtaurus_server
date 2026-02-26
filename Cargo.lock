@@ -334,10 +334,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "gtaurus_common"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "serde",
+ "serde_json",
+ "serialport",
+ "tokio",
+]
+
+[[package]]
 name = "gtaurus_server"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "gtaurus_common",
  "reqwest",
  "serde",
  "serde_json",
