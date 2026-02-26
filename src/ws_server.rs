@@ -101,6 +101,16 @@ async fn attempt_auto_connect(state: Arc<crate::AppState>, config: &ServerConfig
                 log_err(&format!("[WS] Auto-connect failed on port {}: {}", port, e));
             } else {
                 log_msg(&format!("[WS] Successfully auto-connected to {}", port));
+                // Send a status query to verify the connection is alive and
+                // to immediately populate the app with the controller's state.
+                // This is especially important after a power cycle where the
+                // controller may be in alarm state.
+                if let Err(e) = lock.send_realtime(0x3F) {
+                    log_err(&format!(
+                        "[WS] Post-connect status query failed: {}. Connection may be stale.",
+                        e
+                    ));
+                }
             }
         }
     }
