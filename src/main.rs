@@ -22,13 +22,7 @@ async fn main() {
     can only be accessed from your trusted local network.
                                                                              
     "#);
-    println!("Starting Gtaurus Standalone Server...");
-    println!(">> Ready to bridge the gap between web and machine.");
-    println!("");
-    println!("Web Dashboard: http://0.0.0.0:8080");
-    println!("WebSocket API: ws://0.0.0.0:9001");
-    println!("");
-
+    
     let state = Arc::new(AppState {
         driver: Arc::new(Mutex::new(Box::new(FluidNCDriver::new()))),
     });

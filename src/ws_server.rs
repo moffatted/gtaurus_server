@@ -48,7 +48,7 @@ impl Default for ServerConfig {
             auto_connect: true,
             default_serial_port: None,
             default_baud_rate: Some(115200),
-            http_port: Some(8088),
+            http_port: Some(14201),
             web_root: Some("./public".to_string()),
         }
     }
@@ -146,14 +146,16 @@ pub async fn start_server(state: Arc<crate::AppState>) {
             return;
         }
     };
-    log_msg(&format!("[WS] Server listening on ws://{}", addr));
+    log_msg(&format!("[WS] WebSocket Bridge listening on ws://{}", addr));
 
     // Spin up HTTP static file server if a root is defined
     let web_root = config
         .web_root
         .clone()
         .unwrap_or_else(|| "./public".to_string());
-    let http_port = config.http_port.unwrap_or(8080);
+    let http_port = config.http_port.unwrap_or(14201);
+
+    log_msg(&format!("[HTTP] Web Dashboard: http://0.0.0.0:{}", http_port));
 
     // Check if the directory exists, otherwise create it so the server doesn't panic
     if !std::path::Path::new(&web_root).exists() {
@@ -168,27 +170,7 @@ pub async fn start_server(state: Arc<crate::AppState>) {
         use warp::Filter;
         let routes = warp::fs::dir(web_root.clone()).with(warp::cors().allow_any_origin());
 
-        log_msg(&format!(
-            "[HTTP] Attempting to start Dashboard Web Server on http://0.0.0.0:{}...",
-            http_port
-        ));
-
-        // Attempt to bind to the port first to give a better error message if it fails
-        match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", http_port)).await {
-            Ok(_) => {
-                log_msg(&format!(
-                    "[HTTP] Dashboard Web Server is now serving '{}' at http://0.0.0.0:{}",
-                    web_root, http_port
-                ));
-                warp::serve(routes).run(([0, 0, 0, 0], http_port)).await;
-            }
-            Err(e) => {
-                log_err(&format!(
-                    "[HTTP] CRITICAL: Failed to bind to port {}. Port may be in use or blocked: {}",
-                    http_port, e
-                ));
-            }
-        }
+        warp::serve(routes).run(([0, 0, 0, 0], http_port)).await;
     });
 
     while let Ok((stream, _)) = listener.accept().await {
