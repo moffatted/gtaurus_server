@@ -1,4 +1,6 @@
 #!/bin/bash
+# @file setup_systemd.sh
+# @purpose Automates the building and installation of the gtaurus_server as a systemd user service on Linux.
 set -e
 
 # Resolves the absolute path of the directory containing this script

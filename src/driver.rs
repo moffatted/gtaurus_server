@@ -1,3 +1,7 @@
+/**
+ * @file driver.rs
+ * @purpose Server-side driver wrapper that attaches event observers and handles command routing between the WebSocket server and the core library.
+ */
 use gtaurus_common::{
     DriverEventObserver, FluidNCDriver as LibDriver, GCodeConnection as LibGCodeConnection,
 };

@@ -1,3 +1,7 @@
+/**
+ * @file ws_server.rs
+ * @purpose WebSocket server implementation handling client connections, command invocation, and file system management for the CNC bridge.
+ */
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use std::sync::Arc;
@@ -165,7 +169,10 @@ pub async fn start_server(state: Arc<crate::AppState>) {
         .unwrap_or_else(|| "./public".to_string());
     let http_port = config.http_port.unwrap_or(14201);
 
-    log_msg(&format!("[HTTP] Web Dashboard: http://0.0.0.0:{}", http_port));
+    log_msg(&format!(
+        "[HTTP] Web Dashboard: http://0.0.0.0:{}",
+        http_port
+    ));
 
     // Check if the directory exists, otherwise create it so the server doesn't panic
     if !std::path::Path::new(&web_root).exists() {
