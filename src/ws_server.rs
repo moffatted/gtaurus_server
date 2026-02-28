@@ -516,17 +516,43 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
         }
         "stream_local_gcode" => {
             let path = args["path"].as_str().unwrap_or("").to_string();
+            let feed_override: Option<f64> = args["feedRateOverride"].as_f64();
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
             let driver_clone = state.driver.clone();
             std::thread::spawn(move || {
                 println!("[GTaurus Server] Starting G-code stream job...");
+                let mut has_sent_initial_f = false;
                 for line in content.lines() {
                     let l = line.trim();
                     if l.is_empty() || l.starts_with(';') || l.starts_with('(') {
                         continue;
                     }
+
+                    let mut final_line = l.to_string();
+
+                    if let Some(target_f) = feed_override {
+                        if l.contains('F') || l.contains('f') {
+                            let parts: Vec<&str> = l.split_whitespace().collect();
+                            let mut new_parts = Vec::new();
+                            for p in parts {
+                                if p.starts_with('F') || p.starts_with('f') {
+                                    new_parts.push(format!("F{:.1}", target_f));
+                                } else {
+                                    new_parts.push(p.to_string());
+                                }
+                            }
+                            final_line = new_parts.join(" ");
+                            has_sent_initial_f = true;
+                        } else if (l.contains("G1") || l.contains("G2") || l.contains("G3"))
+                            && !has_sent_initial_f
+                        {
+                            final_line = format!("{} F{:.1}", l, target_f);
+                            has_sent_initial_f = true;
+                        }
+                    }
+
                     if let Ok(mut driver) = driver_clone.lock() {
-                        let _ = driver.send_command(l.to_string());
+                        let _ = driver.send_command(final_line);
                     }
                 }
                 println!("[GTaurus Server] Finished streaming G-code job.");
