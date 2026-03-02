@@ -1,3 +1,4 @@
 /target
 *.log
 server_config.json
+/public
