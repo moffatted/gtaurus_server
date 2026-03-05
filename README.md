@@ -31,6 +31,15 @@ The `gtaurus_server` acts as this broker:
 - Rust (`rustup`) toolchain.
 - Standard build tools (e.g., `build-essential` on Linux).
 
+### 📷 Camera Support (Optional)
+
+To use the built-in Camera Viewer and hardware settings manager within the Gtaurus web interface:
+
+- You must have a camera physically connected to your CNC host machine.
+- **Dependency**: [Crowsnest](https://github.com/mainsail-crew/crowsnest) must be installed on your Linux host (specifically v4+ supporting `ustreamer` or `camera-streamer`).
+- **Configuration Path**: The server expects your Crowsnest config to be located at `~/printer_data/config/crowsnest.conf` (standard for Moonraker/Mainsail setups).
+- **Auto-Bootstrapping**: If Crowsnest is installed globally via root, Gtaurus Server will automatically migrate it to a user-level `systemd` service (`systemctl --user ...`) on startup via the `setup_crowsnest.sh` script. This enables seamless, passwordless camera restarts when adjusting settings (brightness, exposure, etc.) from the UI.
+
 ## Building
 
 To build the server for release:
