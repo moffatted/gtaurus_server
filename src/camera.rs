@@ -74,6 +74,8 @@ pub fn set_camera_settings(config_path: &str, updates: Value) -> Result<Value, S
         "zoom",
     ];
 
+    let mut file_changed = false;
+
     for (k, v) in obj {
         if hardware_props.contains(&k.as_str()) {
             // Apply via v4l2-ctl
@@ -85,7 +87,6 @@ pub fn set_camera_settings(config_path: &str, updates: Value) -> Result<Value, S
             }
         } else if !config_path.is_empty() {
             // Attempt to apply to crowsnest.conf
-            // Implementation left basic for now
             if let Ok(content) = fs::read_to_string(config_path) {
                 let mut new_lines = vec![];
                 let mut replaced = false;
@@ -107,13 +108,19 @@ pub fn set_camera_settings(config_path: &str, updates: Value) -> Result<Value, S
                     }
                 }
 
-                let _ = fs::write(config_path, new_lines.join("\n"));
+                if fs::write(config_path, new_lines.join("\n")).is_ok() {
+                    file_changed = true;
+                }
             }
         }
     }
 
-    // Attempt to restart crowsnest if config changed? (requires sudo / systemctl usually)
-    // Maybe skip restart logic in this basic version or allow them to hit a restart button.
+    // Restart crowsnest user service to apply changes
+    if file_changed {
+        let _ = Command::new("systemctl")
+            .args(["--user", "restart", "crowsnest"])
+            .output();
+    }
 
     Ok(serde_json::json!({"status": "success"}))
 }
