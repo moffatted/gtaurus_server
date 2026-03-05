@@ -60,6 +60,35 @@ pub fn get_camera_settings(config_path: &str) -> Result<Value, String> {
     Ok(current_settings)
 }
 
+pub fn init_camera_service() {
+    let home = std::env::var("HOME").unwrap_or_else(|_| String::new());
+    if !home.is_empty() {
+        let conf_path = format!("{}/printer_data/config/crowsnest.conf", home);
+        let service_path = format!("{}/.config/systemd/user/crowsnest.service", home);
+
+        // If either the config or the user systemd service is missing, we provision it.
+        if !std::path::Path::new(&conf_path).exists()
+            || !std::path::Path::new(&service_path).exists()
+        {
+            let script_path = "./scripts/setup_crowsnest.sh";
+            if std::path::Path::new(script_path).exists() {
+                println!("Crowsnest User-Service missing. Auto-provisioning now...");
+                match Command::new("bash").arg(script_path).output() {
+                    Ok(out) => {
+                        println!("Setup output: {}", String::from_utf8_lossy(&out.stdout));
+                        if !out.status.success() {
+                            eprintln!("Setup error: {}", String::from_utf8_lossy(&out.stderr));
+                        }
+                    }
+                    Err(e) => eprintln!("Failed to spawn setup script: {}", e),
+                }
+            } else {
+                println!("Notice: scripts/setup_crowsnest.sh not found, skipping camera setup.");
+            }
+        }
+    }
+}
+
 pub fn set_camera_settings(config_path: &str, updates: Value) -> Result<Value, String> {
     let obj = updates.as_object().ok_or("Updates must be an object")?;
 

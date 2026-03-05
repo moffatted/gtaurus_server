@@ -15,6 +15,9 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
+    // Attempt auto-setup of Crowsnest if config is missing
+    camera::init_camera_service();
+
     println!(
         r#"
     
