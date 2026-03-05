@@ -39,6 +39,7 @@ To use the built-in Camera Viewer and hardware settings manager within the Gtaur
 - **Dependency**: [Crowsnest](https://github.com/mainsail-crew/crowsnest) must be installed on your Linux host (specifically v4+ supporting `ustreamer` or `camera-streamer`).
 - **Configuration Path**: The server expects your Crowsnest config to be located at `~/printer_data/config/crowsnest.conf` (standard for Moonraker/Mainsail setups).
 - **Auto-Bootstrapping**: If Crowsnest is installed globally via root, Gtaurus Server will automatically migrate it to a user-level `systemd` service (`systemctl --user ...`) on startup via the `setup_crowsnest.sh` script. This enables seamless, passwordless camera restarts when adjusting settings (brightness, exposure, etc.) from the UI.
+- **Conflict Warning**: You must manually stop and disable the global system-level Crowsnest service entirely (`sudo systemctl disable --now crowsnest`) to prevent port conflicts with the new local user-level process driving the Gtaurus controls.
 
 ## Building
 
