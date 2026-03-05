@@ -559,6 +559,15 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             });
             Ok(serde_json::Value::String("Streaming started".to_string()))
         }
+        "get_camera_settings" => {
+            let config_path = args["configPath"].as_str().unwrap_or("");
+            crate::camera::get_camera_settings(config_path)
+        }
+        "set_camera_settings" => {
+            let config_path = args["configPath"].as_str().unwrap_or("");
+            let updates = args["updates"].clone();
+            crate::camera::set_camera_settings(config_path, updates)
+        }
         _ => Err(format!(
             "Command {} not implemented in standalone server",
             cmd
