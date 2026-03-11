@@ -1,8 +1,8 @@
-mod camera;
-/**
+/*
  * @file main.rs
  * @purpose Entry point for the standalone server, initializing the application state and starting the WebSocket server.
  */
+mod camera;
 mod driver;
 mod ws_server;
 

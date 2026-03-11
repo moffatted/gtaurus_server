@@ -1,4 +1,4 @@
-/**
+/*
  * @file ws_server.rs
  * @purpose WebSocket server implementation handling client connections, command invocation, and file system management for the CNC bridge.
  */

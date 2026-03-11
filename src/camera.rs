@@ -1,3 +1,7 @@
+/*
+ * @file camera.rs
+ * @purpose Camera service module for integrating and controlling v4l2 cameras and Crowsnest settings.
+ */
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
