@@ -52,7 +52,7 @@ impl Default for ServerConfig {
             auto_connect: true,
             default_serial_port: None,
             default_baud_rate: Some(115200),
-            http_port: Some(14201),
+            http_port: Some(1420),
             web_root: Some("./public".to_string()),
         }
     }
@@ -167,7 +167,7 @@ pub async fn start_server(state: Arc<crate::AppState>) {
         .web_root
         .clone()
         .unwrap_or_else(|| "./public".to_string());
-    let http_port = config.http_port.unwrap_or(14201);
+    let http_port = config.http_port.unwrap_or(1420);
 
     log_msg(&format!(
         "[HTTP] Web Dashboard: http://0.0.0.0:{}",
