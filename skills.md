@@ -66,6 +66,25 @@ and operational safety.
 - Transport tests for timeout and retry semantics.
 - Regression tests for every production incident.
 
+### 9. Source Control and GitHub Workflow
+
+- Keep one concern per branch and avoid cross-cutting unrelated changes.
+- Use conventional commit messages with clear server-impact language.
+- Keep pull requests small enough for complete reviewer validation.
+- Require successful CI, lint, and test runs before merge.
+- Record operational risk and rollback notes in pull request descriptions.
+- Link production incidents to follow-up pull requests and regression tests.
+
+### 10. T3 + Tauri + Rust Server Testing Practices
+
+- Verify websocket contracts against the frontend typed client.
+- Test reconnect, heartbeat, timeout, and backpressure behavior under load.
+- Add integration tests that simulate long-running job orchestration.
+- Validate malformed payload handling and authorization boundaries.
+- Use trait-driven fakes for camera and driver layers in CI.
+- Add reliability tests for pause-resume-stop state transitions.
+- Ensure every production bug has a deterministic repro test case.
+
 ## Coding Standards
 
 - Keep modules focused: ws, driver, camera, and runtime concerns.
