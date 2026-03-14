@@ -791,6 +791,15 @@ async fn handle_invoke(state: &crate::AppState, cmd: &str, args: Value) -> Resul
             let updates = args["updates"].clone();
             crate::camera::set_camera_settings(config_path, updates)
         }
+        "parse_gcode_file" => {
+            let path = args["path"]
+                .as_str()
+                .or(args["filePath"].as_str())
+                .unwrap_or("")
+                .to_string();
+            let analysis = crate::gcode::parse_gcode_file_impl(path)?;
+            serde_json::to_value(analysis).map_err(|e| e.to_string())
+        }
         _ => Err(format!(
             "Command {} not implemented in standalone server",
             cmd
