@@ -5,6 +5,7 @@
 mod camera;
 mod driver;
 mod gcode;
+mod surfacing;
 mod ws_server;
 
 use driver::{FluidNCDriver, GCodeConnection};
