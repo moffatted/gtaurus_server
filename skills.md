@@ -1,5 +1,12 @@
 # Skills Guide for gtaurus_server
 
+## Note
+
+This file is a human-facing engineering guide.
+
+Agent-loadable skills should be defined as `SKILL.md` files under
+`.agent/skills/<skill-name>/SKILL.md`.
+
 ## Purpose
 
 This file defines engineering skills and quality standards for the
