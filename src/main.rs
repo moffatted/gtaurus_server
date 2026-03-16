@@ -3,6 +3,7 @@
  * @purpose Entry point for the standalone server, initializing the application state and starting the WebSocket server.
  */
 mod camera;
+mod checkpoint;
 mod driver;
 mod gcode;
 mod surfacing;
