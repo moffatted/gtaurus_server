@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::hash::{BuildHasher, RandomState, Hash};
+use std::hash::{BuildHasher, RandomState};
 
 /// A snapshot of machine state at job interruption for recovery and resume.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -79,67 +79,6 @@ pub struct SpindleState {
 }
 
 impl JobCheckpoint {
-    /// Create a new checkpoint with default values
-    pub fn new(
-        file_name: String,
-        file_path: String,
-        current_line: usize,
-        total_lines: usize,
-    ) -> Self {
-        // Generate a simple ID from timestamp and random digits
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-        let random_part = (std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() % 10000) as u32;
-        
-        Self {
-            checkpoint_id: format!("checkpoint-{}-{}", timestamp, random_part),
-            file_hash: String::new(),
-            file_path,
-            file_name,
-            current_line,
-            total_lines,
-            line_content: String::new(),
-            machine_state: MachineState {
-                status: "Idle".to_string(),
-                mpos: Position {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
-                wpos: Position {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
-            },
-            modal_state: ModalState {
-                units: "G21".to_string(),
-                distance_mode: "G90".to_string(),
-                plane: "G17".to_string(),
-                motion_mode: "G0".to_string(),
-                feed_mode: "G94".to_string(),
-            },
-            work_offset_system: "G54".to_string(),
-            tool_number: None,
-            tool_length_offset: 0.0,
-            spindle: SpindleState {
-                is_active: false,
-                rpm: 0.0,
-                direction: None,
-            },
-            feed_rate: 0.0,
-            interruption_reason: "user_pause".to_string(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        }
-    }
 }
 
 /// Save a checkpoint to disk
