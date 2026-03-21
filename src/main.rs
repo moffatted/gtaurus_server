@@ -7,9 +7,17 @@ mod checkpoint;
 mod driver;
 mod gcode;
 mod surfacing;
+mod ws_aux;
+mod ws_checkpoint;
+mod ws_connection;
+mod ws_job_control;
+mod ws_local_files;
 mod ws_server;
+mod ws_surfacing;
+mod ws_gcode_streaming;
 
 use driver::{FluidNCDriver, GCodeConnection};
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex};
 
@@ -85,6 +93,28 @@ impl JobState {
 pub struct AppState {
     pub driver: Arc<Mutex<Box<dyn GCodeConnection>>>,
     pub job: Arc<JobState>,
+}
+
+pub fn log_msg(msg: &str) {
+    println!("{}", msg);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("gtaurus_server.log")
+    {
+        let _ = writeln!(f, "{}", msg);
+    }
+}
+
+pub fn log_err(msg: &str) {
+    eprintln!("{}", msg);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("gtaurus_server.log")
+    {
+        let _ = writeln!(f, "ERROR: {}", msg);
+    }
 }
 
 #[tokio::main]
