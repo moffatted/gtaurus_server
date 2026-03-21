@@ -1,9 +1,10 @@
-/*
- * @file surfacing.rs
- * @purpose Raster surfacing toolpath generation for standalone bridge server.
- */
+//! Raster surfacing toolpath generation.
+//!
+//! Produces rectangular surfacing passes with configurable angle, stepover,
+//! depth strategy, and travel origin.
 
 #[derive(Debug)]
+/// Parameters controlling surfacing toolpath generation.
 pub struct SurfacingParams {
     pub width: f32,
     pub height: f32,
@@ -71,6 +72,10 @@ fn clip_line(
     Some(((x0 + t0 * dx, y0 + t0 * dy), (x0 + t1 * dx, y0 + t1 * dy)))
 }
 
+/// Generate G-code for a surfacing raster from validated parameters.
+///
+/// # Errors
+/// Returns an error when any required numeric parameter is non-positive.
 pub fn build_surfacing_gcode(p: &SurfacingParams) -> Result<String, String> {
     if p.width <= 0.0 {
         return Err("width must be > 0".into());
@@ -215,6 +220,9 @@ pub fn build_surfacing_gcode(p: &SurfacingParams) -> Result<String, String> {
     Ok(out)
 }
 
+/// Convenience constructor + generator using scalar arguments.
+///
+/// Builds a [`SurfacingParams`] instance and delegates to [`build_surfacing_gcode`].
 pub fn generate_surfacing_toolpath(
     width: f32,
     height: f32,

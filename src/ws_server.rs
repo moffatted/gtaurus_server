@@ -1,7 +1,7 @@
-/*
- * @file ws_server.rs
- * @purpose WebSocket server implementation handling client connections, command invocation, and file system management for the CNC bridge.
- */
+//! WebSocket server entrypoint and request dispatcher.
+//!
+//! Loads runtime config, optionally performs serial auto-connect, and accepts
+//! client connections for command/event routing.
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use std::sync::Arc;
@@ -97,6 +97,10 @@ async fn attempt_auto_connect(state: Arc<crate::AppState>, config: &ServerConfig
     }
 }
 
+/// Start the WebSocket bridge server and serve requests until process shutdown.
+///
+/// # Arguments
+/// * `state` - Shared application state containing driver and job tracker.
 pub async fn start_server(state: Arc<crate::AppState>) {
     let config_path = "server_config.json";
 

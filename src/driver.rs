@@ -1,15 +1,18 @@
-/*
- * @file driver.rs
- * @purpose Server-side driver wrapper that attaches event observers and handles command routing between the WebSocket server and the core library.
- */
+//! Server-side wrapper around `gtaurus_common::FluidNCDriver`.
+//!
+//! This adapter wires server subscribers into the underlying library observer model.
 use gtaurus_common::{
     DriverEventObserver, FluidNCDriver as LibDriver, GCodeConnection as LibGCodeConnection,
 };
 use std::sync::{Arc, Mutex};
 
+/// Server-visible machine connection trait.
+///
+/// Extends the shared library connection trait with `Send` for cross-thread use.
 pub trait GCodeConnection: LibGCodeConnection + Send {}
 impl GCodeConnection for FluidNCDriver {}
 
+/// Wrapper type used by the server to expose the shared driver through a local type.
 pub struct FluidNCDriver {
     inner: LibDriver,
 }
@@ -28,6 +31,7 @@ impl DriverEventObserver for ServerObserver {
 }
 
 impl FluidNCDriver {
+    /// Create a new server driver and attach a broadcast observer for subscriber fan-out.
     pub fn new() -> Self {
         let dummy_subs = Arc::new(Mutex::new(Vec::new()));
         let mut inner = LibDriver::new(Arc::new(ServerObserver {

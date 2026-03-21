@@ -1,5 +1,23 @@
+//! WebSocket handlers for checkpoint persistence and recovery helpers.
+
 use serde_json::Value;
 
+/// Persist a checkpoint payload to disk.
+///
+/// Expects `checkpoint` and optional `savePath` in `args`.
+///
+/// # Example
+///
+/// ```json
+/// {
+///   "checkpoint": { "checkpoint_id": "abc123", "file_path": "C:/jobs/part.nc" },
+///   "savePath": "C:/jobs/part.resume.json"
+/// }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if checkpoint payload is missing/invalid or write fails.
 pub fn save_checkpoint(args: &Value) -> Result<Value, String> {
     let checkpoint_data = args.get("checkpoint").cloned();
     let save_path = args["savePath"].as_str().unwrap_or("").to_string();
@@ -33,6 +51,17 @@ pub fn save_checkpoint(args: &Value) -> Result<Value, String> {
     }
 }
 
+/// Load a checkpoint file and return its structured JSON payload.
+///
+/// # Example
+///
+/// ```json
+/// { "checkpointPath": "C:/jobs/part.resume.json" }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if path is missing, file cannot be read, or JSON is invalid.
 pub fn load_checkpoint(args: &Value) -> Result<Value, String> {
     let checkpoint_path = args["checkpointPath"]
         .as_str()
@@ -60,6 +89,17 @@ pub fn load_checkpoint(args: &Value) -> Result<Value, String> {
     }
 }
 
+/// Compute the default resume checkpoint path for a G-code file path.
+///
+/// # Example
+///
+/// ```json
+/// { "path": "C:/jobs/part.nc" }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if no source path is provided.
 pub fn get_resume_checkpoint_path(args: &Value) -> Result<Value, String> {
     let gcode_path = args["path"]
         .as_str()
@@ -75,6 +115,17 @@ pub fn get_resume_checkpoint_path(args: &Value) -> Result<Value, String> {
     Ok(Value::String(checkpoint_path.to_string_lossy().to_string()))
 }
 
+/// Compute the hash of a file for checkpoint validation.
+///
+/// # Example
+///
+/// ```json
+/// { "path": "C:/jobs/part.nc" }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if path is missing or file hashing fails.
 pub fn compute_file_hash(args: &Value) -> Result<Value, String> {
     let file_path = args["path"]
         .as_str()

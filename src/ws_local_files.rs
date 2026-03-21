@@ -1,6 +1,9 @@
+//! WebSocket handlers for local file and directory operations.
+
 use serde_json::Value;
 use std::path::PathBuf;
 
+/// Resolve a client-provided path into a host path, falling back to `gcode_files` under home.
 pub fn get_resolved_path(path_arg: &str) -> PathBuf {
     let pb = PathBuf::from(path_arg);
 
@@ -24,12 +27,14 @@ pub fn get_resolved_path(path_arg: &str) -> PathBuf {
     pb
 }
 
+/// Ensure a directory exists, creating it recursively if needed.
 pub fn ensure_dir_exists(path_arg: &str) -> Result<Value, String> {
     let path = get_resolved_path(path_arg);
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     Ok(Value::Null)
 }
 
+/// List regular files in a directory with name, size, and modification time.
 pub fn list_local_files(path_arg: &str) -> Result<Value, String> {
     let path = get_resolved_path(path_arg);
     println!("[GTaurus Server] list_local_files: resolved_path={:?}", path);
@@ -59,6 +64,7 @@ pub fn list_local_files(path_arg: &str) -> Result<Value, String> {
     Ok(Value::Array(files))
 }
 
+/// Read a UTF-8 text file from the resolved directory.
 pub fn read_local_file(path_arg: &str, filename: &str) -> Result<Value, String> {
     let mut full_path = get_resolved_path(path_arg);
     full_path.push(filename);
@@ -66,6 +72,7 @@ pub fn read_local_file(path_arg: &str, filename: &str) -> Result<Value, String> 
     Ok(Value::String(content))
 }
 
+/// Write a UTF-8 text file to the resolved directory, creating parents when required.
 pub fn save_local_file(path_arg: &str, filename: &str, content: &str) -> Result<Value, String> {
     let path = get_resolved_path(path_arg);
 
@@ -83,6 +90,7 @@ pub fn save_local_file(path_arg: &str, filename: &str, content: &str) -> Result<
     Ok(Value::Null)
 }
 
+/// Delete a file in the resolved directory.
 pub fn delete_local_file(path_arg: &str, filename: &str) -> Result<Value, String> {
     let mut full_path = get_resolved_path(path_arg);
     full_path.push(filename);
@@ -90,6 +98,7 @@ pub fn delete_local_file(path_arg: &str, filename: &str) -> Result<Value, String
     Ok(Value::Null)
 }
 
+/// Copy a source file into a destination storage directory.
 pub fn copy_to_storage(source_path_arg: &str, dest_dir_arg: &str) -> Result<Value, String> {
     let source = PathBuf::from(source_path_arg);
     if let Some(filename) = source.file_name() {
@@ -104,6 +113,7 @@ pub fn copy_to_storage(source_path_arg: &str, dest_dir_arg: &str) -> Result<Valu
     }
 }
 
+/// Return the current user's home directory path.
 pub fn get_home_dir() -> Result<Value, String> {
     let home = if cfg!(windows) {
         std::env::var("USERPROFILE").unwrap_or_else(|_| "C:/".to_string())
@@ -113,6 +123,7 @@ pub fn get_home_dir() -> Result<Value, String> {
     Ok(Value::String(home))
 }
 
+/// Perform a lightweight heuristic check that a file contains likely G-code lines.
 pub fn validate_gcode_file(path_arg: &str) -> Result<Value, String> {
     let path = get_resolved_path(path_arg);
     let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;

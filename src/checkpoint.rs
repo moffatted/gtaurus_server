@@ -1,7 +1,4 @@
-/*
- * @file checkpoint.rs
- * @purpose Handles persistence and recovery of job checkpoints for resume functionality.
- */
+//! Checkpoint persistence and recovery utilities for resumable jobs.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -49,6 +46,7 @@ pub struct JobCheckpoint {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+/// Machine status snapshot stored in a checkpoint.
 pub struct MachineState {
     pub status: String,
     pub mpos: Position,
@@ -56,6 +54,7 @@ pub struct MachineState {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+/// Cartesian position in machine or work coordinates.
 pub struct Position {
     pub x: f64,
     pub y: f64,
@@ -63,6 +62,7 @@ pub struct Position {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+/// Relevant G-code modal state required for safe resume.
 pub struct ModalState {
     pub units: String,           // G20 or G21
     pub distance_mode: String,   // G90 or G91
@@ -72,6 +72,7 @@ pub struct ModalState {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+/// Spindle runtime state at interruption time.
 pub struct SpindleState {
     pub is_active: bool,
     pub rpm: f64,
@@ -81,7 +82,13 @@ pub struct SpindleState {
 impl JobCheckpoint {
 }
 
-/// Save a checkpoint to disk
+/// Save a checkpoint to disk.
+///
+/// If `save_path` is empty, the checkpoint is written next to the G-code file
+/// using `{stem}.resume.json` naming.
+///
+/// # Errors
+/// Returns an error if serialization or file writing fails.
 pub fn save_checkpoint(checkpoint: &JobCheckpoint, save_path: &str) -> Result<(), String> {
     // If no explicit save path provided, derive it from the job file
     let checkpoint_path = if save_path.is_empty() {
@@ -111,7 +118,10 @@ pub fn save_checkpoint(checkpoint: &JobCheckpoint, save_path: &str) -> Result<()
     Ok(())
 }
 
-/// Load a checkpoint from disk
+/// Load a checkpoint from disk.
+///
+/// # Errors
+/// Returns an error if file reading or JSON parsing fails.
 pub fn load_checkpoint(checkpoint_path: &str) -> Result<JobCheckpoint, String> {
     let contents = fs::read_to_string(checkpoint_path)
         .map_err(|e| format!("Failed to read checkpoint file: {}", e))?;
@@ -127,7 +137,7 @@ pub fn load_checkpoint(checkpoint_path: &str) -> Result<JobCheckpoint, String> {
     Ok(checkpoint)
 }
 
-/// Get the resume checkpoint path for a given G-code file
+/// Build the default resume checkpoint path for a G-code file.
 pub fn get_resume_checkpoint_path(gcode_path: &str) -> PathBuf {
     let base = Path::new(gcode_path);
     let stem = base
@@ -138,7 +148,13 @@ pub fn get_resume_checkpoint_path(gcode_path: &str) -> PathBuf {
     parent.join(format!("{}.resume.json", stem))
 }
 
-/// Compute a simple file hash (in production, use SHA256)
+/// Compute a simple file hash for checkpoint validation.
+///
+/// # Errors
+/// Returns an error if the file cannot be opened or read.
+///
+/// # Note
+/// This uses a non-cryptographic hash. Prefer SHA-256 for stronger guarantees.
 pub fn compute_file_hash(file_path: &str) -> Result<String, String> {
     use std::io::Read;
 

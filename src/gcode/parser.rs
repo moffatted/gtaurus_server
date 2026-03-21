@@ -3,6 +3,10 @@ use super::utils::{extract_tool_info, linearize_arc};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+/// Parse a G-code file and return geometric and process analysis metadata.
+///
+/// # Errors
+/// Returns an error if the file cannot be opened/read or if JSON conversion fails upstream.
 pub fn parse_gcode_file_impl(path: String) -> Result<GCodeAnalysis, String> {
     let file = File::open(&path).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);

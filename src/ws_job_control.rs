@@ -1,6 +1,9 @@
+//! WebSocket handlers for job lifecycle operations (status, pause, resume, cancel).
+
 use serde_json::Value;
 use std::sync::atomic::Ordering;
 
+/// Return the current streaming job status snapshot.
 pub fn get_job_status(state: &crate::AppState) -> Result<Value, String> {
     let status = state
         .job
@@ -25,6 +28,7 @@ pub fn get_job_status(state: &crate::AppState) -> Result<Value, String> {
     }))
 }
 
+/// Pause the active streaming job and issue feed hold (0x21).
 pub fn pause_job(state: &crate::AppState) -> Result<Value, String> {
     state.job.pause_flag.store(true, Ordering::SeqCst);
     if let Ok(mut s) = state.job.status.lock() {
@@ -51,6 +55,7 @@ pub fn pause_job(state: &crate::AppState) -> Result<Value, String> {
     Ok(Value::String("Job paused".to_string()))
 }
 
+/// Resume a paused streaming job and issue cycle start (0x7E).
 pub fn resume_job(state: &crate::AppState) -> Result<Value, String> {
     state.job.pause_flag.store(false, Ordering::SeqCst);
     if let Ok(mut s) = state.job.status.lock() {
@@ -77,6 +82,7 @@ pub fn resume_job(state: &crate::AppState) -> Result<Value, String> {
     Ok(Value::String("Job resumed".to_string()))
 }
 
+/// Cancel the current streaming job and issue soft reset (0x18).
 pub fn cancel_job(state: &crate::AppState) -> Result<Value, String> {
     state.job.pause_flag.store(false, Ordering::SeqCst);
     state.job.cancel_flag.store(true, Ordering::SeqCst);

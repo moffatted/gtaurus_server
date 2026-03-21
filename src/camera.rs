@@ -1,11 +1,13 @@
-/*
- * @file camera.rs
- * @purpose Camera service module for integrating and controlling v4l2 cameras and Crowsnest settings.
- */
+//! Camera service integration for v4l2 controls and Crowsnest configuration.
+
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
 
+/// Read camera settings from hardware (`v4l2-ctl`) and optional Crowsnest config file.
+///
+/// # Errors
+/// Returns an error only for JSON/file conversion failures. Missing tools are tolerated.
 pub fn get_camera_settings(config_path: &str) -> Result<Value, String> {
     let mut current_settings = serde_json::json!({});
 
@@ -64,6 +66,7 @@ pub fn get_camera_settings(config_path: &str) -> Result<Value, String> {
     Ok(current_settings)
 }
 
+/// Ensure camera service prerequisites exist and auto-provision Crowsnest when missing.
 pub fn init_camera_service() {
     let home = std::env::var("HOME").unwrap_or_else(|_| String::new());
     if !home.is_empty() {
@@ -93,6 +96,10 @@ pub fn init_camera_service() {
     }
 }
 
+/// Apply camera settings updates to hardware controls and/or Crowsnest config.
+///
+/// # Errors
+/// Returns an error if `updates` is not a JSON object.
 pub fn set_camera_settings(config_path: &str, updates: Value) -> Result<Value, String> {
     let obj = updates.as_object().ok_or("Updates must be an object")?;
 

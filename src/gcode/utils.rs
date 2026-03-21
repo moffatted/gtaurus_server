@@ -1,3 +1,6 @@
+/// Extract tool diameter/type/angle metadata from a free-form tool description.
+///
+/// Returns `(diameter_mm, tool_type, angle_deg)`.
 pub fn extract_tool_info(tool_name: Option<&str>) -> (f32, String, Option<f32>) {
     if let Some(name) = tool_name {
         let lower = name.to_lowercase();
@@ -56,6 +59,9 @@ pub fn extract_tool_info(tool_name: Option<&str>) -> (f32, String, Option<f32>) 
     }
 }
 
+/// Approximate an arc move (G2/G3) with linear segments.
+///
+/// Returns intermediate points including the arc end point.
 pub fn linearize_arc(
     start: [f32; 3],
     end: [f32; 3],

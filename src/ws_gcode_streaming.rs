@@ -1,11 +1,33 @@
-/*
- * @file ws_gcode_streaming.rs
- * @purpose Handles streaming G-code from local files with support for pause, resume, and cancel operations.
- */
+//! WebSocket-driven G-code streaming with pause/resume/cancel support.
 
 use serde_json::Value;
 use std::sync::atomic::Ordering;
 
+/// Start asynchronous streaming of a local G-code file.
+///
+/// The function initializes shared job state and spawns a worker thread that:
+/// - iterates active G-code lines,
+/// - supports pause/resume/cancel,
+/// - optionally applies a feed-rate override,
+/// - emits periodic `job://status` events.
+///
+/// # Arguments
+/// - `state`: global app state with driver and job tracker.
+/// - `args`: request payload containing `path`, optional `feedRateOverride`, and optional `startLine`.
+///
+/// # Errors
+/// Returns an error if the file cannot be read.
+///
+/// # Example
+///
+/// Client request payload:
+/// ```json
+/// {
+///   "path": "C:/Users/operator/gcode/part.nc",
+///   "feedRateOverride": 900.0,
+///   "startLine": 1
+/// }
+/// ```
 pub fn stream_local_gcode(
     state: &crate::AppState,
     args: &Value,

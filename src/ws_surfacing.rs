@@ -1,5 +1,10 @@
+//! WebSocket handler for surfacing toolpath generation.
+
 use serde_json::Value;
 
+/// Build a raster surfacing toolpath from request arguments.
+///
+/// Accepts both camelCase and snake_case keys for compatibility.
 pub fn generate_surfacing_toolpath(args: &Value) -> Result<Value, String> {
     let width = args["width"].as_f64().unwrap_or(0.0) as f32;
     let height = args["height"].as_f64().unwrap_or(0.0) as f32;
