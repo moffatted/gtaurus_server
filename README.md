@@ -148,4 +148,40 @@ If you want the `gtaurus_server` to start automatically the moment the machine r
 
 ```bash
 loginctl enable-linger $USER
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome! If you encounter a bug, have a feature request, or would like to improve the code, please open an issue or submit a PR.
+
+**Please note:** Gtaurus Server is part of a personal hobbyist CNC project maintained in spare time. Responses and reviews may not be immediate, but all contributions are genuinely appreciated.
+
+---
+
+## ⚠️ Safety Disclaimer
+
+Gtaurus Server is designed to interface with CNC machines and CNC control boards, which are capable of causing serious personal injury, property damage, or equipment damage if operated incorrectly or unsafely.
+
+**Use this software entirely at your own risk.** The author(s) of this software accept no responsibility or liability for any damage, injury, loss, or harm of any kind arising from the use, misuse, or inability to use this software in connection with a CNC machine, CNC control board, or any other hardware or system. By using this software, you acknowledge that you understand the risks involved and that you assume full responsibility for its safe and proper use.
+
+It is your responsibility to:
+
+- Understand the operation of your CNC machine and its control firmware before issuing any commands.
+- Follow all safety guidelines provided by your machine manufacturer and electronics vendor.
+- Ensure your machine is in a known safe state before executing any G-code or automated motion.
+- Never leave a running CNC machine unattended.
+- Maintain adequate emergency stop capability at all times.
+
+---
+
+## 🤖 Development Notes
+
+This project was developed with significant assistance from AI coding tools, including Google Gemini, GitHub Copilot, and Anthropic Claude. All architectural decisions, feature design, and integration work were directed and reviewed by the project author.
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
 ```
